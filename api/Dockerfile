@@ -31,7 +31,7 @@ RUN pip install --no-cache-dir fastapi uvicorn
 
 COPY --from=fetcher /out/di2se /opt/di2se
 
-# IMPORTANT: build context must be repo root for these paths to work
+# Build context must be repo root for these paths:
 COPY commands.json /app/commands.json
 COPY api/main.py /app/main.py
 
@@ -39,12 +39,12 @@ RUN useradd -m -u 10001 app \
   && chown -R app:app /app /opt/di2se
 USER app
 
-# run di2save from the bin dir so ./data resolves
 ENV DI2SE_BIN_DIR=/opt/di2se/bin
 ENV DI2SAVE_BIN=./di2save
-
 ENV COMMANDS_FILE=/app/commands.json
 ENV SAVE_DIR=/data
+ENV CMD_TIMEOUT_SEC=60
+ENV MAX_OUTPUT_CHARS=400000
 
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host=0.0.0.0", "--port=8000"]
