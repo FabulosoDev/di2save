@@ -3,21 +3,30 @@ import json
 import os
 import re
 import subprocess
-from typing import Dict, List, Any
+from collections import deque
+from typing import Dict, List, Any, Tuple, Set
 
-# DI2SE_ROOT is the directory that contains ./bin/di2save and ./bin/data/...
 DI2SE_ROOT = os.path.abspath(os.environ.get("DI2SE_ROOT", "."))
 OUT_FILE = os.environ.get("OUT_FILE", "commands.json")
-MAX_DEPTH = int(os.environ.get("MAX_DEPTH", "8"))
+MAX_DEPTH = int(os.environ.get("MAX_DEPTH", "10"))
+
+# Each line is a seed command like:
+#   --help
+#   --help player
+#   help inventory items
+HELP_SEEDS_RAW = os.environ.get("HELP_SEEDS", "").strip()
 
 SUBCOMMANDS_HEADER_RE = re.compile(r"^\s*Subcommands:\s*$", re.IGNORECASE)
 
-def run_help(path: List[str]) -> str:
-    # Run from the bin/ dir so relative data/ paths resolve (your package has bin/data/*)
+def di2save_run(argv: List[str], cwd: str) -> str:
+    p = subprocess.run(argv, cwd=cwd, capture_output=True, text=True)
+    return (p.stdout or "") + "\n" + (p.stderr or "")
+
+def run_help_tokens(path: List[str]) -> str:
+    # Run from bin/ so bin/data/* is found
     bin_dir = os.path.join(DI2SE_ROOT, "bin")
     cmd = ["./di2save", "--help"] + path
-    p = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
-    return (p.stdout or "") + "\n" + (p.stderr or "")
+    return di2save_run(cmd, cwd=bin_dir)
 
 def parse_subcommands(help_text: str) -> List[str]:
     lines = help_text.splitlines()
@@ -28,7 +37,6 @@ def parse_subcommands(help_text: str) -> List[str]:
         if SUBCOMMANDS_HEADER_RE.match(line):
             in_block = True
             continue
-
         if in_block:
             if not line.strip():
                 break
@@ -45,28 +53,81 @@ def parse_subcommands(help_text: str) -> List[str]:
             out.append(s)
     return out
 
-def crawl() -> Dict[str, Dict[str, Any]]:
+def parse_seed_line(line: str) -> Tuple[str, List[str]]:
+    """
+    Returns (kind, tokens)
+    kind:
+      - "helpflag": for '--help' seeds (tokens are the path after --help)
+      - "command":  for normal command seeds, e.g. 'help inventory items'
+    """
+    parts = line.strip().split()
+    if not parts:
+        return ("", [])
+    if parts[0] == "--help":
+        return ("helpflag", parts[1:])
+    return ("command", parts)
+
+def crawl_from_seeds() -> Dict[str, Dict[str, Any]]:
     registry: Dict[str, Dict[str, Any]] = {}
+    visited_help_paths: Set[Tuple[str, ...]] = set()
 
-    def rec(cmd_path: List[str], depth: int):
-        if depth > MAX_DEPTH:
-            return
-        if cmd_path:
-            dotted = ".".join(cmd_path)
-            registry[dotted] = {"argv": cmd_path}
+    q = deque()
 
-        help_text = run_help(cmd_path)
-        for s in parse_subcommands(help_text):
-            rec(cmd_path + [s], depth + 1)
+    # Always include root help crawl even if seeds omitted
+    q.append( ("helpflag", []) )
 
-    roots = parse_subcommands(run_help([]))
-    for r in roots:
-        rec([r], 1)
+    # Add user-provided seeds
+    if HELP_SEEDS_RAW:
+        for line in HELP_SEEDS_RAW.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            kind, toks = parse_seed_line(line)
+            if kind:
+                q.append((kind, toks))
+
+    while q:
+        kind, toks = q.popleft()
+
+        if kind == "helpflag":
+            # This seed says: run ./di2save --help <toks> and parse Subcommands
+            path = toks
+            tpath = tuple(path)
+            if tpath in visited_help_paths:
+                continue
+            visited_help_paths.add(tpath)
+
+            depth = len(path)
+            if depth > MAX_DEPTH:
+                continue
+
+            # Run help for this path and discover subcommands
+            help_text = run_help_tokens(path)
+            subs = parse_subcommands(help_text)
+
+            # Queue deeper help paths
+            for s in subs:
+                q.append(("helpflag", path + [s]))
+
+            # Also add the help path itself as an invokable command
+            # e.g. player.inventory.ls will be added when helpflag reaches that leaf
+            if path:
+                dotted = ".".join(path)
+                registry[dotted] = {"argv": path}
+
+        elif kind == "command":
+            # Add explicit non-flag command seeds to registry as-is
+            # e.g. help.inventory.items => argv ["help","inventory","items"]
+            dotted = ".".join(toks)
+            registry[dotted] = {"argv": toks}
+
+        else:
+            continue
 
     return registry
 
 def main():
-    reg = crawl()
+    reg = crawl_from_seeds()
     with open(OUT_FILE, "w", encoding="utf-8") as f:
         json.dump(reg, f, indent=2, sort_keys=True)
     print(f"Wrote {len(reg)} commands to {OUT_FILE}")
