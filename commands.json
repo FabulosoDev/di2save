@@ -1,0 +1,185 @@
+{
+  "file": {
+    "argv": [
+      "file"
+    ]
+  },
+  "file.pack": {
+    "argv": [
+      "file",
+      "pack"
+    ]
+  },
+  "file.unpack": {
+    "argv": [
+      "file",
+      "unpack"
+    ]
+  },
+  "help": {
+    "argv": [
+      "help"
+    ]
+  },
+  "help.inventory": {
+    "argv": [
+      "help",
+      "inventory"
+    ]
+  },
+  "help.inventory.items": {
+    "argv": [
+      "help",
+      "inventory",
+      "items"
+    ]
+  },
+  "help.inventory.upgrades": {
+    "argv": [
+      "help",
+      "inventory",
+      "upgrades"
+    ]
+  },
+  "help.quick": {
+    "argv": [
+      "help",
+      "quick"
+    ]
+  },
+  "player": {
+    "argv": [
+      "player"
+    ]
+  },
+  "player.inventory": {
+    "argv": [
+      "player",
+      "inventory"
+    ]
+  },
+  "player.inventory.add": {
+    "argv": [
+      "player",
+      "inventory",
+      "add"
+    ]
+  },
+  "player.inventory.edit": {
+    "argv": [
+      "player",
+      "inventory",
+      "edit"
+    ]
+  },
+  "player.inventory.ls": {
+    "argv": [
+      "player",
+      "inventory",
+      "ls"
+    ]
+  },
+  "player.inventory.rm": {
+    "argv": [
+      "player",
+      "inventory",
+      "rm"
+    ]
+  },
+  "player.inventory.upgrade": {
+    "argv": [
+      "player",
+      "inventory",
+      "upgrade"
+    ]
+  },
+  "player.inventory.upgrade.add": {
+    "argv": [
+      "player",
+      "inventory",
+      "upgrade",
+      "add"
+    ]
+  },
+  "player.inventory.upgrade.rm": {
+    "argv": [
+      "player",
+      "inventory",
+      "upgrade",
+      "rm"
+    ]
+  },
+  "player.profile": {
+    "argv": [
+      "player",
+      "profile"
+    ]
+  },
+  "player.profile.ls": {
+    "argv": [
+      "player",
+      "profile",
+      "ls"
+    ]
+  },
+  "quick": {
+    "argv": [
+      "quick"
+    ]
+  },
+  "quick.apply": {
+    "argv": [
+      "quick",
+      "apply"
+    ]
+  },
+  "stash": {
+    "argv": [
+      "stash"
+    ]
+  },
+  "stash.add": {
+    "argv": [
+      "stash",
+      "add"
+    ]
+  },
+  "stash.edit": {
+    "argv": [
+      "stash",
+      "edit"
+    ]
+  },
+  "stash.ls": {
+    "argv": [
+      "stash",
+      "ls"
+    ]
+  },
+  "stash.rm": {
+    "argv": [
+      "stash",
+      "rm"
+    ]
+  },
+  "stash.upgrade": {
+    "argv": [
+      "stash",
+      "upgrade"
+    ]
+  },
+  "stash.upgrade.add": {
+    "argv": [
+      "stash",
+      "upgrade",
+      "add"
+    ]
+  },
+  "stash.upgrade.rm": {
+    "argv": [
+      "stash",
+      "upgrade",
+      "rm"
+    ]
+  }
+}
