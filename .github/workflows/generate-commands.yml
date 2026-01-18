@@ -1,0 +1,71 @@
+name: generate-commands-json
+
+on:
+  workflow_dispatch:
+    inputs:
+      di2se_url:
+        description: "URL to di2se tar.gz"
+        required: true
+        default: "https://builds.steffenl.com/download/dead-island-2-save-editor/0.10.0/di2se-0.10.0-linux.x86_64.tar.gz"
+      max_depth:
+        description: "Max recursion depth for help crawl"
+        required: true
+        default: "8"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download + extract di2save (nested tar)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl -fsSL "${{ inputs.di2se_url }}" -o di2se.tar.gz
+
+          # 1) Extract .tar.gz -> gives a .tar
+          mkdir -p unpack
+          tar -xzf di2se.tar.gz -C unpack
+
+          # Find the inner tar (should be exactly one)
+          INNER_TAR="$(ls -1 unpack/*.tar | head -n 1)"
+          echo "Inner tar: $INNER_TAR"
+
+          # 2) Extract inner .tar -> gives di2se-... directory
+          tar -xf "$INNER_TAR" -C unpack
+
+          # Find the extracted root dir (contains bin/di2save and data/)
+          DI2SE_ROOT="$(find unpack -maxdepth 2 -type d -name 'di2se-*linux.x86_64' | head -n 1)"
+          echo "DI2SE_ROOT=$DI2SE_ROOT" | tee -a "$GITHUB_ENV"
+
+          chmod +x "$DI2SE_ROOT/bin/di2save"
+
+          # Sanity check: run help from the root dir so ./data is available
+          (cd "$DI2SE_ROOT" && ./bin/di2save --help | head -n 30)
+
+      - name: Generate commands.json
+        shell: bash
+        env:
+          DI2SE_ROOT: ${{ env.DI2SE_ROOT }}
+          DI2SAVE_REL: bin/di2save
+          OUT_FILE: commands.json
+          MAX_DEPTH: ${{ inputs.max_depth }}
+        run: |
+          set -euo pipefail
+          python tools/generate_commands.py
+          jq 'keys | length' commands.json || true
+          head -n 20 commands.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: commands-json
+          path: commands.json
