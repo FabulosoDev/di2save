@@ -5,19 +5,18 @@ import re
 import subprocess
 from typing import Dict, List, Any
 
-# Root directory that contains ./bin/di2save and ./data/...
-DI2SE_ROOT = os.environ.get("DI2SE_ROOT", ".")
-DI2SAVE_REL = os.environ.get("DI2SAVE_REL", "bin/di2save")
-
+# DI2SE_ROOT is the directory that contains ./bin/di2save and ./bin/data/...
+DI2SE_ROOT = os.path.abspath(os.environ.get("DI2SE_ROOT", "."))
 OUT_FILE = os.environ.get("OUT_FILE", "commands.json")
 MAX_DEPTH = int(os.environ.get("MAX_DEPTH", "8"))
 
 SUBCOMMANDS_HEADER_RE = re.compile(r"^\s*Subcommands:\s*$", re.IGNORECASE)
 
 def run_help(path: List[str]) -> str:
-    exe = os.path.join(DI2SE_ROOT, DI2SAVE_REL)
-    cmd = [exe, "--help"] + path
-    p = subprocess.run(cmd, cwd=DI2SE_ROOT, capture_output=True, text=True)
+    # Run from the bin/ dir so relative data/ paths resolve (your package has bin/data/*)
+    bin_dir = os.path.join(DI2SE_ROOT, "bin")
+    cmd = ["./di2save", "--help"] + path
+    p = subprocess.run(cmd, cwd=bin_dir, capture_output=True, text=True)
     return (p.stdout or "") + "\n" + (p.stderr or "")
 
 def parse_subcommands(help_text: str) -> List[str]:
@@ -29,6 +28,7 @@ def parse_subcommands(help_text: str) -> List[str]:
         if SUBCOMMANDS_HEADER_RE.match(line):
             in_block = True
             continue
+
         if in_block:
             if not line.strip():
                 break
@@ -36,6 +36,7 @@ def parse_subcommands(help_text: str) -> List[str]:
             if m:
                 subs.append(m.group(1))
 
+    # de-dup preserving order
     seen = set()
     out = []
     for s in subs:
@@ -47,16 +48,16 @@ def parse_subcommands(help_text: str) -> List[str]:
 def crawl() -> Dict[str, Dict[str, Any]]:
     registry: Dict[str, Dict[str, Any]] = {}
 
-    def rec(path: List[str], depth: int):
+    def rec(cmd_path: List[str], depth: int):
         if depth > MAX_DEPTH:
             return
-        if path:
-            dotted = ".".join(path)
-            registry[dotted] = {"argv": path}
+        if cmd_path:
+            dotted = ".".join(cmd_path)
+            registry[dotted] = {"argv": cmd_path}
 
-        help_text = run_help(path)
+        help_text = run_help(cmd_path)
         for s in parse_subcommands(help_text):
-            rec(path + [s], depth + 1)
+            rec(cmd_path + [s], depth + 1)
 
     roots = parse_subcommands(run_help([]))
     for r in roots:
