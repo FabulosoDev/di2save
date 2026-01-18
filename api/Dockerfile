@@ -15,36 +15,34 @@ RUN curl -fsSL "$DI2SE_URL" -o di2se.tar.gz \
   && tar -xzf di2se.tar.gz -C /out \
   && rm -f di2se.tar.gz
 
-# Normalize to /out/di2se (copy the extracted di2se-* dir)
+# Normalize extracted folder to /out/di2se
 RUN set -eux; \
-  DI2SE_DIR="$(find /out -maxdepth 2 -type f -path '*/bin/di2save' -print | head -n 1 | xargs -r dirname | xargs -r dirname)"; \
+  DI2SE_DIR="$(find /out -maxdepth 3 -type f -path '*/bin/di2save' -print | head -n 1 | xargs -r dirname | xargs -r dirname)"; \
   test -n "$DI2SE_DIR"; \
   mkdir -p /out/di2se; \
   cp -a "$DI2SE_DIR"/. /out/di2se/
 
-# ---- stage 2: runtime ----
+# ---- stage 2: runtime API ----
 FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# FastAPI deps
 RUN pip install --no-cache-dir fastapi uvicorn
 
-# Copy di2se runtime payload (bin/di2save + bin/data/*)
 COPY --from=fetcher /out/di2se /opt/di2se
 
-# Copy default commands.json from repo (can be overridden by mount)
+# IMPORTANT: build context must be repo root for these paths to work
 COPY commands.json /app/commands.json
-COPY main.py /app/main.py
+COPY api/main.py /app/main.py
 
-# Non-root
 RUN useradd -m -u 10001 app \
   && chown -R app:app /app /opt/di2se
 USER app
 
+# run di2save from the bin dir so ./data resolves
 ENV DI2SE_BIN_DIR=/opt/di2se/bin
-ENV DI2SAVE_BIN=/opt/di2se/bin/di2save
-# Default, baked-in mapping:
+ENV DI2SAVE_BIN=./di2save
+
 ENV COMMANDS_FILE=/app/commands.json
 ENV SAVE_DIR=/data
 
